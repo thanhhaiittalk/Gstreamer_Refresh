@@ -28,3 +28,24 @@ add_executable(appsink_example
 target_link_libraries(appsink_example
     ${GST_LIBRARIES}
 )
+
+# Add appsrc example
+add_executable(appsrc_to_mp4
+    src/appsrc_to_mp4.cpp
+)
+
+# attach include dirs and compile flags to this target
+target_include_directories(appsrc_to_mp4
+    PRIVATE
+        ${GST_INCLUDE_DIRS}
+)
+
+target_compile_options(appsrc_to_mp4
+    PRIVATE
+        ${GST_CFLAGS_OTHER}
+)
+
+target_link_libraries(appsrc_to_mp4
+    PRIVATE
+        ${GST_LIBRARIES}
+)
