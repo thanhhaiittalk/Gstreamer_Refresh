@@ -29,13 +29,16 @@ public:
     // Return frames starting from last keyframe up to end
     std::vector<EncodedFrame> getPrebufferFromLastKeyframe() const {
         if (frames_.empty()) return {};
-        int idx = (int)frames_.size() - 1;
 
-        // Find last keyframe walking backwards
-        while (idx >= 0 && !frames_[idx].keyframe) {
-            --idx;
+        size_t idx = 0;
+
+
+        while (idx < frames_.size() && !frames_[idx].keyframe) {
+            ++idx;
         }
-        if (idx < 0) idx = 0;
+        if (idx == frames_.size()) {
+            return {};
+        }
 
         return std::vector<EncodedFrame>(frames_.begin() + idx, frames_.end());
     }
@@ -63,6 +66,11 @@ public:
 private:
     FrameRing ring_;
     std::atomic<bool> recordingActive_;
+
+    // Stats just for debugging
+    std::atomic<uint64_t> totalFrames_{0};
+    std::atomic<uint64_t> prebufferPushed_{0};
+    std::atomic<uint64_t> livePushed_{0};
 
     GstElement* pipelineCap_;  // v4l2src...appsink
     GstElement* appsinkCap_;

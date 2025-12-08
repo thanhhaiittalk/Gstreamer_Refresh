@@ -44,6 +44,8 @@ void PrebufferRecorder::onNewBuffer(GstBuffer* buffer) {
     f.keyframe = key;
     ring_.push(f);
 
+    totalFrames_++;
+
     // If recording, also push to appsrc
     if (recordingActive_ && appsrcRec_) {
         GstBuffer* out = gst_buffer_new_allocate(nullptr, map.size, nullptr);
@@ -51,6 +53,7 @@ void PrebufferRecorder::onNewBuffer(GstBuffer* buffer) {
         GST_BUFFER_PTS(out) = pts;
         GST_BUFFER_DTS(out) = pts;
         gst_app_src_push_buffer(GST_APP_SRC(appsrcRec_), out);
+        livePushed_++;
     }
 
     gst_buffer_unmap(buffer, &map);
@@ -61,11 +64,13 @@ bool PrebufferRecorder::initPipelines() {
 
     // Capture pipeline
     const char* capDesc =
-        "v4l2src ! videoconvert ! "
-        "x264enc tune=zerolatency key-int-max=30 bitrate=2000 speed-preset=ultrafast ! "
-        "h264parse config-interval=-1 ! "
-        "video/x-h264,stream-format=byte-stream,alignment=au ! "
-        "appsink name=cap sync=false emit-signals=true";
+            "videotestsrc is-live=true pattern=ball ! "
+            "video/x-raw,framerate=30/1,width=640,height=360 ! "
+            "videoconvert ! "
+            "x264enc tune=zerolatency key-int-max=30 bitrate=2000 speed-preset=ultrafast ! "
+            "h264parse config-interval=-1 ! "
+            "video/x-h264,stream-format=byte-stream,alignment=au ! "
+            "appsink name=cap sync=false emit-signals=true";;
 
     pipelineCap_ = gst_parse_launch(capDesc, nullptr);
     appsinkCap_  = gst_bin_get_by_name(GST_BIN(pipelineCap_), "cap");
@@ -97,6 +102,7 @@ void PrebufferRecorder::triggerStart() {
         GST_BUFFER_PTS(buf) = f.pts;
         GST_BUFFER_DTS(buf) = f.pts;
         gst_app_src_push_buffer(GST_APP_SRC(appsrcRec_), buf);
+        prebufferPushed_++;
     }
 
     // 2) Now start also pushing live frames in onNewBuffer()
@@ -106,6 +112,11 @@ void PrebufferRecorder::triggerStart() {
 void PrebufferRecorder::triggerStop() {
     if (!recordingActive_) return;
     recordingActive_ = false;
+
+    std::cout << "Stats:\n";
+    std::cout << "  totalFrames_        = " << totalFrames_ << "\n";
+    std::cout << "  prebufferPushed_    = " << prebufferPushed_ << "\n";
+    std::cout << "  livePushed_         = " << livePushed_ << "\n";
 
     // Tell appsrc no more buffers
     gst_app_src_end_of_stream(GST_APP_SRC(appsrcRec_));
